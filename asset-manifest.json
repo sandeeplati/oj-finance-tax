@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/oj-finance-tax/static/css/main.d6a24a55.css",
+    "main.js": "/oj-finance-tax/static/js/main.bc7aa537.js",
+    "index.html": "/oj-finance-tax/index.html",
+    "main.d6a24a55.css.map": "/oj-finance-tax/static/css/main.d6a24a55.css.map",
+    "main.bc7aa537.js.map": "/oj-finance-tax/static/js/main.bc7aa537.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.d6a24a55.css",
+    "static/js/main.bc7aa537.js"
+  ]
+}
