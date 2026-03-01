@@ -81,7 +81,8 @@ router.post('/upload', upload.single('form16'), async (req, res) => {
     }
 
     const age = parseInt(req.body.age) || 30;
-    const taxData = await parseForm16(req.file.buffer);
+    const password = req.body.password || '';   // optional PDF password
+    const taxData = await parseForm16(req.file.buffer, password || undefined);
     const comparisonResult = compareTaxRegimes(taxData, age);
     const recommendations = generateRecommendations(taxData, comparisonResult, age);
     const summary = generateTaxSummary(taxData, comparisonResult);
@@ -110,9 +111,20 @@ router.post('/upload-multiple', upload.array('form16s', 5), async (req, res) => 
 
     const age = parseInt(req.body.age) || 30;
 
-    // Parse all uploaded PDFs
+    // passwords[] array — one password per file (empty string = no password)
+    const rawPasswords = req.body.passwords;
+    const passwords = Array.isArray(rawPasswords)
+      ? rawPasswords
+      : rawPasswords
+        ? [rawPasswords]
+        : [];
+
+    // Parse all uploaded PDFs (with individual passwords)
     const parsedList = await Promise.all(
-      req.files.map(file => parseForm16(file.buffer))
+      req.files.map((file, i) => {
+        const pw = passwords[i] || '';
+        return parseForm16(file.buffer, pw || undefined);
+      })
     );
 
     // Merge into a single combined taxData

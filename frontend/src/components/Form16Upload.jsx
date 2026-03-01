@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, FileText, X, AlertCircle, User, Plus, Building2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Upload, FileText, X, AlertCircle, User, Plus, Building2, Trash2, ChevronDown, ChevronUp, Lock } from 'lucide-react';
 
 // Single employer Form 16 entry
 const EmployerForm16 = ({ index, entry, onChange, onRemove, canRemove }) => {
@@ -82,6 +82,25 @@ const EmployerForm16 = ({ index, entry, onChange, onRemove, canRemove }) => {
               placeholder="e.g. Infosys Ltd, TCS, etc."
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
             />
+          </div>
+
+          {/* PDF Password */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              <Lock className="inline w-3 h-3 mr-1" />
+              PDF Password <span className="text-gray-400">(if password-protected)</span>
+            </label>
+            <input
+              type="password"
+              value={entry.password}
+              onChange={(e) => onChange(index, 'password', e.target.value)}
+              placeholder="Usually your PAN number, e.g. ABCDE1234F"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition font-mono tracking-wider"
+              autoComplete="off"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              💡 Most employer Form 16s are password-protected with your PAN number (uppercase)
+            </p>
           </div>
 
           {/* Period */}
@@ -169,6 +188,7 @@ const EmployerForm16 = ({ index, entry, onChange, onRemove, canRemove }) => {
 const createEntry = (fromMonth = 'Apr', toMonth = 'Mar') => ({
   file: null,
   employerName: '',
+  password: '',
   fromMonth,
   toMonth,
   error: '',
@@ -207,13 +227,14 @@ const Form16Upload = ({ onUpload, isLoading, onManualEntry }) => {
     }
 
     const files = filesEntries.map(en => en.file);
+    const passwords = filesEntries.map(en => en.password || '');
     const meta = filesEntries.map(en => ({
       employerName: en.employerName,
       fromMonth: en.fromMonth,
       toMonth: en.toMonth,
     }));
 
-    onUpload(files, age, meta);
+    onUpload(files, age, passwords, meta);
   };
 
   const hasAnyFile = entries.some(en => en.file);

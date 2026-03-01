@@ -23,11 +23,11 @@ function App() {
   const [taxResult, setTaxResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // files = array of File objects, meta = array of {employerName, fromMonth, toMonth}
-  const handleUpload = async (files, age, meta) => {
+  // files = array of File objects, passwords = array of strings, meta = array of {employerName, fromMonth, toMonth}
+  const handleUpload = async (files, age, passwords, meta) => {
     setIsLoading(true);
     try {
-      const result = await uploadMultipleForm16(files, age);
+      const result = await uploadMultipleForm16(files, age, passwords);
       if (result.success) {
         setTaxResult(result.data);
         setActiveTab('summary');

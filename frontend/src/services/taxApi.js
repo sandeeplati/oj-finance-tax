@@ -234,15 +234,19 @@ export const uploadForm16 = async (file, age) => {
 
 /**
  * Upload multiple Form 16 PDFs (for users who changed jobs during the year).
- * Files is an array of File objects.
+ * @param {File[]} files - Array of PDF File objects
+ * @param {number} age - Employee age
+ * @param {string[]} [passwords] - Optional array of PDF passwords (one per file, usually PAN number)
  */
-export const uploadMultipleForm16 = async (files, age) => {
+export const uploadMultipleForm16 = async (files, age, passwords = []) => {
   if (IS_GITHUB_PAGES) {
     throw new Error('PDF upload requires the backend server. Please use Manual Entry instead.');
   }
   const formData = new FormData();
   files.forEach(file => formData.append('form16s', file));
   formData.append('age', age);
+  // Send passwords as an array field (one per file)
+  passwords.forEach(pw => formData.append('passwords', pw || ''));
   const response = await api.post('/tax/upload-multiple', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });

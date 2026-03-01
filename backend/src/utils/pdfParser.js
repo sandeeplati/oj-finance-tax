@@ -1,14 +1,27 @@
 const pdfParse = require('pdf-parse');
 
 /**
- * Parse Form 16 PDF and extract relevant tax information
+ * Parse Form 16 PDF and extract relevant tax information.
+ * @param {Buffer} pdfBuffer - Raw PDF buffer
+ * @param {string} [password] - Optional PDF password (usually employee's PAN number)
  */
-async function parseForm16(pdfBuffer) {
+async function parseForm16(pdfBuffer, password) {
   try {
-    const data = await pdfParse(pdfBuffer);
+    // pdf-parse passes options directly to pdf.js getDocument().
+    // For password-protected PDFs, pass { data: buffer, password } as the first arg.
+    const input = password
+      ? { data: new Uint8Array(pdfBuffer), password }
+      : pdfBuffer;
+
+    const data = await pdfParse(input);
     const text = data.text;
     return extractTaxData(text);
   } catch (error) {
+    // Give a clear, user-friendly error for wrong/missing password
+    const msg = error.message || '';
+    if (msg.includes('No password') || msg.includes('password') || msg.includes('encrypted')) {
+      throw new Error('This PDF is password-protected. Please enter the PDF password (usually your PAN number in uppercase, e.g. ABCDE1234F).');
+    }
     throw new Error(`Failed to parse PDF: ${error.message}`);
   }
 }
