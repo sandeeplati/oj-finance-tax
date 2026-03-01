@@ -7,7 +7,7 @@ import Recommendations from './components/Recommendations';
 import DeductionsAnalyzer from './components/DeductionsAnalyzer';
 import TaxSlabs from './components/TaxSlabs';
 import ManualEntry from './components/ManualEntry';
-import { uploadForm16 } from './services/taxApi';
+import { uploadMultipleForm16 } from './services/taxApi';
 
 const NAV_TABS = [
   { id: 'upload', label: 'Upload Form 16', icon: FileText },
@@ -23,19 +23,29 @@ function App() {
   const [taxResult, setTaxResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleUpload = async (file, age) => {
+  // files = array of File objects, meta = array of {employerName, fromMonth, toMonth}
+  const handleUpload = async (files, age, meta) => {
     setIsLoading(true);
     try {
-      const result = await uploadForm16(file, age);
+      const result = await uploadMultipleForm16(files, age);
       if (result.success) {
         setTaxResult(result.data);
         setActiveTab('summary');
-        toast.success('Form 16 analyzed successfully!');
+        const count = result.data.employerCount || files.length;
+        toast.success(
+          count > 1
+            ? `${count} Form 16s analyzed & combined successfully!`
+            : 'Form 16 analyzed successfully!'
+        );
       } else {
         toast.error(result.error || 'Failed to analyze Form 16');
       }
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to connect to server. Please ensure the backend is running.');
+      toast.error(
+        err.response?.data?.error ||
+        err.message ||
+        'Failed to connect to server. Please ensure the backend is running.'
+      );
     } finally {
       setIsLoading(false);
     }

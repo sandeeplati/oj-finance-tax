@@ -170,6 +170,53 @@ const clientCalculateTax = (taxData, age) => {
   };
 };
 
+// ─── Client-side multi-Form16 merge (used on GitHub Pages) ───────────────────
+
+/**
+ * Merge multiple client-side parsed tax data objects.
+ * Since we can't parse PDFs client-side, this is used when the user
+ * manually provides data for multiple employers.
+ */
+export const clientMergeMultipleForm16 = (parsedList) => {
+  if (parsedList.length === 1) return parsedList[0];
+
+  const merged = {
+    employeeInfo: parsedList[0].employeeInfo || {},
+    employers: parsedList.map((p, i) => ({
+      index: i + 1,
+      employerInfo: p.employerInfo || {},
+      salaryDetails: p.salaryDetails || {},
+      taxDetails: { tdsPaid: (p.taxDetails || {}).tdsPaid || 0 },
+    })),
+    salaryDetails: {
+      grossSalary: 0, basicSalary: 0, hra: 0,
+      specialAllowance: 0, lta: 0, medicalAllowance: 0,
+      otherAllowances: 0, perquisites: 0, netSalary: 0,
+    },
+    deductions: parsedList[parsedList.length - 1].deductions || {},
+    taxDetails: {
+      tdsPaid: 0,
+      assessmentYear: (parsedList[0].taxDetails || {}).assessmentYear || '2024-25',
+    },
+  };
+
+  for (const p of parsedList) {
+    const s = p.salaryDetails || {};
+    merged.salaryDetails.grossSalary += s.grossSalary || 0;
+    merged.salaryDetails.basicSalary += s.basicSalary || 0;
+    merged.salaryDetails.hra += s.hra || 0;
+    merged.salaryDetails.specialAllowance += s.specialAllowance || 0;
+    merged.salaryDetails.lta += s.lta || 0;
+    merged.salaryDetails.medicalAllowance += s.medicalAllowance || 0;
+    merged.salaryDetails.otherAllowances += s.otherAllowances || 0;
+    merged.salaryDetails.perquisites += s.perquisites || 0;
+    merged.salaryDetails.netSalary += s.netSalary || 0;
+    merged.taxDetails.tdsPaid += (p.taxDetails || {}).tdsPaid || 0;
+  }
+
+  return merged;
+};
+
 // ─── API functions ────────────────────────────────────────────────────────────
 
 export const uploadForm16 = async (file, age) => {
@@ -180,6 +227,23 @@ export const uploadForm16 = async (file, age) => {
   formData.append('form16', file);
   formData.append('age', age);
   const response = await api.post('/tax/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+};
+
+/**
+ * Upload multiple Form 16 PDFs (for users who changed jobs during the year).
+ * Files is an array of File objects.
+ */
+export const uploadMultipleForm16 = async (files, age) => {
+  if (IS_GITHUB_PAGES) {
+    throw new Error('PDF upload requires the backend server. Please use Manual Entry instead.');
+  }
+  const formData = new FormData();
+  files.forEach(file => formData.append('form16s', file));
+  formData.append('age', age);
+  const response = await api.post('/tax/upload-multiple', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return response.data;
