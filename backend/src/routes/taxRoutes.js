@@ -2,6 +2,8 @@ const express = require('express');
 const multer = require('multer');
 const router = express.Router();
 const { parseForm16, extractTaxData } = require('../utils/pdfParser');
+const { parseForm26AS } = require('../utils/form26asParser');
+const { generateForm26ASInsights } = require('../utils/form26asInsights');
 const pdfParse = require('pdf-parse');
 const { compareTaxRegimes } = require('../utils/taxCalculator');
 const { generateRecommendations, generateNextYearRecommendations, generateTaxSummary } = require('../utils/recommendationEngine');
@@ -262,6 +264,41 @@ router.post('/chat', (req, res) => {
 router.get('/chat/suggestions', (req, res) => {
   const hasForm16 = req.query.hasForm16 === 'true';
   res.json({ success: true, data: getSuggestedQuestions(hasForm16) });
+});
+
+// POST /api/tax/upload-26as - Upload and parse Form 26AS
+router.post('/upload-26as', upload.single('form26as'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No Form 26AS PDF file uploaded' });
+    }
+
+    const password = req.body.password || '';
+    const form26asData = await parseForm26AS(req.file.buffer, password || undefined);
+
+    // If Form 16 data is provided (as JSON in body), cross-reference it
+    let form16Data = null;
+    if (req.body.form16Data) {
+      try {
+        form16Data = JSON.parse(req.body.form16Data);
+      } catch (e) {
+        // ignore parse error — proceed without Form 16 data
+      }
+    }
+
+    const insights = generateForm26ASInsights(form26asData, form16Data);
+
+    res.json({
+      success: true,
+      data: {
+        form26asData,
+        insights,
+      },
+    });
+  } catch (error) {
+    console.error('Error processing Form 26AS:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // POST /api/tax/debug-parse - Debug endpoint: returns raw text + extracted fields

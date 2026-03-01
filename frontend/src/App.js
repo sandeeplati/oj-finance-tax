@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
-import { FileText, BarChart2, Lightbulb, BookOpen, PenTool, RefreshCw, Calculator } from 'lucide-react';
+import { FileText, BarChart2, Lightbulb, BookOpen, PenTool, RefreshCw, Calculator, ShieldCheck } from 'lucide-react';
 import Form16Upload from './components/Form16Upload';
 import TaxSummary from './components/TaxSummary';
 import Recommendations from './components/Recommendations';
@@ -8,6 +8,8 @@ import DeductionsAnalyzer from './components/DeductionsAnalyzer';
 import TaxSlabs from './components/TaxSlabs';
 import ManualEntry from './components/ManualEntry';
 import ChatBot from './components/ChatBot';
+import Form26ASUpload from './components/Form26ASUpload';
+import Form26ASSummary from './components/Form26ASSummary';
 import { uploadMultipleForm16 } from './services/taxApi';
 
 const NAV_TABS = [
@@ -15,6 +17,7 @@ const NAV_TABS = [
   { id: 'summary', label: 'Tax Summary', icon: BarChart2, requiresData: true },
   { id: 'recommendations', label: 'Recommendations', icon: Lightbulb, requiresData: true },
   { id: 'deductions', label: 'Deductions', icon: BookOpen, requiresData: true },
+  { id: 'form26as', label: 'Form 26AS', icon: ShieldCheck },
   { id: 'manual', label: 'Manual Entry', icon: PenTool },
   { id: 'slabs', label: 'Tax Slabs', icon: Calculator },
 ];
@@ -23,6 +26,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('upload');
   const [taxResult, setTaxResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [form26asResult, setForm26asResult] = useState(null);
 
   // files = array of File objects, passwords = array of strings, meta = array of {employerName, fromMonth, toMonth}
   const handleUpload = async (files, age, passwords, meta) => {
@@ -58,8 +62,14 @@ function App() {
     toast.success('Tax calculated successfully!');
   };
 
+  const handleForm26ASResult = (data) => {
+    setForm26asResult(data);
+    toast.success('Form 26AS analyzed successfully!');
+  };
+
   const handleReset = () => {
     setTaxResult(null);
+    setForm26asResult(null);
     setActiveTab('upload');
   };
 
@@ -143,7 +153,7 @@ function App() {
                     { icon: '📊', label: 'Tax Analysis' },
                     { icon: '⚖️', label: 'Regime Comparison' },
                     { icon: '💡', label: 'Smart Recommendations' },
-                    { icon: '💰', label: 'Maximize Savings' },
+                    { icon: '🛡️', label: 'Form 26AS Insights' },
                   ].map((f, i) => (
                     <div key={i} className="text-center">
                       <div className="text-2xl mb-1">{f.icon}</div>
@@ -158,6 +168,24 @@ function App() {
               isLoading={isLoading}
               onManualEntry={() => setActiveTab('manual')}
             />
+            {/* Form 26AS prompt after Form 16 upload */}
+            {taxResult && (
+              <div className="mt-6 bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-xl">🛡️</div>
+                  <div>
+                    <p className="font-semibold text-emerald-800">Also upload Form 26AS for complete analysis</p>
+                    <p className="text-sm text-emerald-600">Cross-verify TDS, check advance tax, and detect mismatches</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setActiveTab('form26as')}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition"
+                >
+                  Upload Form 26AS →
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -186,6 +214,23 @@ function App() {
         {/* Deductions */}
         {activeTab === 'deductions' && taxResult && (
           <DeductionsAnalyzer taxData={taxResult.taxData} />
+        )}
+
+        {/* Form 26AS */}
+        {activeTab === 'form26as' && (
+          <div className="space-y-6">
+            {!form26asResult ? (
+              <Form26ASUpload
+                taxData={taxResult}
+                onResult={handleForm26ASResult}
+              />
+            ) : (
+              <Form26ASSummary
+                data={form26asResult}
+                onReupload={() => setForm26asResult(null)}
+              />
+            )}
+          </div>
         )}
 
         {/* Tax Slabs */}

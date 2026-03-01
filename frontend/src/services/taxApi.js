@@ -388,6 +388,26 @@ export const getDeductionsInfo = async () => {
   }
 };
 
+/**
+ * Upload Form 26AS PDF for parsing and insights.
+ * @param {File} file - Form 26AS PDF file
+ * @param {string} [password] - Optional PDF password (usually PAN number)
+ * @param {Object|null} [form16Data] - Optional Form 16 taxData for cross-verification
+ */
+export const uploadForm26AS = async (file, password = '', form16Data = null) => {
+  if (IS_GITHUB_PAGES) {
+    throw new Error('Form 26AS upload requires the backend server. Please run the backend locally.');
+  }
+  const formData = new FormData();
+  formData.append('form26as', file);
+  if (password) formData.append('password', password);
+  if (form16Data) formData.append('form16Data', JSON.stringify(form16Data));
+  const response = await api.post('/tax/upload-26as', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+};
+
 export const chatWithBot = async (question, taxData, comparisonResult) => {
   if (IS_GITHUB_PAGES) {
     return clientChatbot(question, taxData, comparisonResult);
