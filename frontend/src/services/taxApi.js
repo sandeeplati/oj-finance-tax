@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { clientChatbot } from './clientChatbot';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
@@ -96,44 +97,142 @@ const clientCalculateTax = (taxData, age) => {
     title: 'Maximize Section 80C',
     description: `You can invest ₹${(150000 - sec80C).toLocaleString('en-IN')} more in PPF, ELSS, LIC, or EPF to save up to ₹${Math.round((150000 - sec80C) * 0.3).toLocaleString('en-IN')} in tax.`,
     potentialSaving: Math.round((150000 - sec80C) * 0.3),
-    priority: 'high',
-    section: '80C',
+    priority: 'HIGH',
+    category: 'Section 80C',
+    icon: '💰',
+    actionItems: ['ELSS Mutual Funds (3-year lock-in)', 'PPF (15-year, 7.1%)', 'NSC', 'Tax-saving FD (5-year)', 'LIC Premium'],
   });
   if (sec80D < 25000) recommendations.push({
     title: 'Health Insurance (Section 80D)',
     description: `Buy health insurance to claim up to ₹25,000 deduction under Section 80D.`,
     potentialSaving: Math.round((25000 - sec80D) * 0.3),
-    priority: 'high',
-    section: '80D',
+    priority: 'HIGH',
+    category: 'Section 80D',
+    icon: '🏥',
+    actionItems: ['Self & Family: Up to ₹25,000', 'Parents (below 60): Additional ₹25,000', 'Parents (60+): Additional ₹50,000'],
   });
   if (nps < 50000) recommendations.push({
     title: 'NPS Investment (Section 80CCD 1B)',
     description: `Invest up to ₹50,000 in NPS for additional deduction over and above 80C limit.`,
     potentialSaving: Math.round((50000 - nps) * 0.3),
-    priority: 'medium',
-    section: '80CCD(1B)',
+    priority: 'MEDIUM',
+    category: 'NPS - Section 80CCD(1B)',
+    icon: '🏦',
+    actionItems: ['Open NPS Tier I account', 'Invest ₹50,000 for extra deduction over 80C', 'Choose equity allocation for long-term growth'],
   });
   if (hra > 0 && hraExemption === 0) recommendations.push({
     title: 'Claim HRA Exemption',
     description: 'You receive HRA but have not claimed exemption. Submit rent receipts to your employer.',
     potentialSaving: Math.round(hra * 0.5 * 0.3),
-    priority: 'high',
-    section: 'HRA',
+    priority: 'HIGH',
+    category: 'HRA Exemption',
+    icon: '🏠',
+    actionItems: ['Submit rent receipts to employer', 'Ensure rent agreement is in place', 'If rent > ₹1L/year, landlord PAN required'],
   });
   if (recommended === 'new') recommendations.push({
     title: 'Switch to New Tax Regime',
     description: `New regime saves you ₹${savings.toLocaleString('en-IN')} compared to old regime for your income profile.`,
     potentialSaving: savings,
-    priority: 'high',
-    section: 'Regime',
+    priority: 'HIGH',
+    category: 'Tax Regime',
+    icon: '🏛️',
+    actionItems: ['Opt for New Tax Regime while filing ITR', 'No need to maintain investment proofs', 'Simpler tax filing process'],
   });
   if (recommended === 'old') recommendations.push({
     title: 'Stay with Old Tax Regime',
     description: `Old regime saves you ₹${savings.toLocaleString('en-IN')} due to your deductions. Keep maximizing 80C, 80D, NPS.`,
     potentialSaving: savings,
-    priority: 'high',
-    section: 'Regime',
+    priority: 'HIGH',
+    category: 'Tax Regime',
+    icon: '🏛️',
+    actionItems: ['File ITR under Old Tax Regime', 'Claim all eligible deductions', 'Submit investment proofs to employer'],
   });
+
+  // ── Next Year Recommendations ──
+  const nextYearRecommendations = [];
+  const gap80C = Math.max(0, 150000 - sec80C);
+  const gap80D = Math.max(0, 25000 - sec80D);
+  const gapNPS = Math.max(0, 50000 - nps);
+
+  nextYearRecommendations.push({
+    category: 'Regime Strategy',
+    icon: '🏛️',
+    priority: 'HIGH',
+    title: `Plan for ${recommended === 'old' ? 'Old' : 'New'} Regime in FY 2025-26`,
+    description: recommended === 'old'
+      ? `Old regime saved you ₹${savings.toLocaleString('en-IN')} this year. Declare investments to employer in April 2025 to reduce monthly TDS.`
+      : `New regime saved you ₹${savings.toLocaleString('en-IN')} this year. Opt for new regime with employer at the start of FY 2025-26.`,
+    impact: savings,
+    timeline: 'April 2025 onwards',
+    actionItems: recommended === 'old'
+      ? ['Declare investment intent to employer in April 2025', 'Start SIP in ELSS from April to spread 80C investment', 'Submit HRA rent receipts quarterly']
+      : ['Opt for New Regime with employer at start of FY 2025-26', 'No investment proofs needed', 'Focus on wealth creation without tax lock-in'],
+  });
+
+  if (gap80C > 0 && recommended === 'old') {
+    const monthly = Math.ceil(gap80C / 12);
+    nextYearRecommendations.push({
+      category: 'Section 80C Planning',
+      icon: '📈',
+      priority: gap80C > 75000 ? 'HIGH' : 'MEDIUM',
+      title: `Start Monthly SIP to Fill ₹${gap80C.toLocaleString('en-IN')} 80C Gap`,
+      description: `Start a monthly SIP of ₹${monthly.toLocaleString('en-IN')} from April to fully utilize the ₹1,50,000 80C limit without year-end rush.`,
+      impact: Math.round(gap80C * 0.3),
+      timeline: 'Start April 2025',
+      actionItems: [`Start ELSS SIP of ₹${monthly.toLocaleString('en-IN')}/month from April 2025`, 'Set up auto-debit to avoid missing months', 'PPF: deposit before April 5 each year for maximum interest'],
+    });
+  }
+
+  if (gap80D > 0 && recommended === 'old') {
+    nextYearRecommendations.push({
+      category: 'Health Insurance',
+      icon: '🏥',
+      priority: 'HIGH',
+      title: 'Upgrade Health Insurance for FY 2025-26',
+      description: `Renew/upgrade health insurance before April 2025. You can claim up to ₹${(25000 + (age >= 60 ? 50000 : 25000)).toLocaleString('en-IN')} under 80D (self + parents).`,
+      impact: Math.round(gap80D * 0.3),
+      timeline: 'Before April 2025',
+      actionItems: ['Renew family floater plan before April 2025', 'Add parents to policy for additional deduction', 'Preventive health check-up: ₹5,000 within 80D limit'],
+    });
+  }
+
+  if (gapNPS > 0 && recommended === 'old') {
+    const monthlyNPS = Math.ceil(gapNPS / 12);
+    nextYearRecommendations.push({
+      category: 'NPS Investment',
+      icon: '🏦',
+      priority: 'MEDIUM',
+      title: 'Maximize NPS 80CCD(1B) — Extra ₹50,000 Deduction',
+      description: `NPS gives ₹50,000 deduction OVER AND ABOVE 80C. Invest ₹${monthlyNPS.toLocaleString('en-IN')}/month next year to maximize this benefit.`,
+      impact: Math.round(gapNPS * 0.3),
+      timeline: 'April 2025 onwards',
+      actionItems: [`Set up monthly NPS contribution of ₹${monthlyNPS.toLocaleString('en-IN')}`, 'Ask employer to deduct NPS from salary', 'Choose Tier I account for tax benefits'],
+    });
+  }
+
+  nextYearRecommendations.push({
+    category: 'ITR Strategy',
+    icon: '📋',
+    priority: 'MEDIUM',
+    title: 'File ITR Early for FY 2025-26 (AY 2026-27)',
+    description: 'Filing ITR early (April–June) speeds up refunds, avoids last-minute errors, and allows time to respond to any notices.',
+    impact: 0,
+    timeline: 'April–July 2026',
+    actionItems: ['Collect Form 16 from employer by June 15, 2026', 'Download Form 26AS and AIS from income tax portal', 'File ITR-1 (salaried, income ≤ ₹50L)', 'e-Verify within 30 days using Aadhaar OTP', 'Deadline: July 31, 2026'],
+  });
+
+  if (gross > 600000) {
+    nextYearRecommendations.push({
+      category: 'Wealth Building',
+      icon: '💹',
+      priority: 'LOW',
+      title: 'Build Tax-Efficient Investment Portfolio for FY 2025-26',
+      description: 'Beyond tax saving, build a diversified portfolio. Long-term capital gains up to ₹1.25L are tax-free; ELSS and equity funds are most tax-efficient.',
+      impact: 0,
+      timeline: 'FY 2025-26',
+      actionItems: ['ELSS: Tax saving + wealth creation (LTCG ₹1.25L tax-free)', 'PPF: Risk-free, tax-free returns at 7.1% p.a.', 'Index Funds: Low cost, market returns', 'Sovereign Gold Bonds: 2.5% interest + gold appreciation', 'Avoid FDs for high earners — interest fully taxable'],
+    });
+  }
 
   return {
     success: true,
@@ -166,8 +265,56 @@ const clientCalculateTax = (taxData, age) => {
         },
       },
       recommendations,
+      nextYearRecommendations,
     },
   };
+};
+
+// ─── Client-side multi-Form16 merge (used on GitHub Pages) ───────────────────
+
+/**
+ * Merge multiple client-side parsed tax data objects.
+ * Since we can't parse PDFs client-side, this is used when the user
+ * manually provides data for multiple employers.
+ */
+export const clientMergeMultipleForm16 = (parsedList) => {
+  if (parsedList.length === 1) return parsedList[0];
+
+  const merged = {
+    employeeInfo: parsedList[0].employeeInfo || {},
+    employers: parsedList.map((p, i) => ({
+      index: i + 1,
+      employerInfo: p.employerInfo || {},
+      salaryDetails: p.salaryDetails || {},
+      taxDetails: { tdsPaid: (p.taxDetails || {}).tdsPaid || 0 },
+    })),
+    salaryDetails: {
+      grossSalary: 0, basicSalary: 0, hra: 0,
+      specialAllowance: 0, lta: 0, medicalAllowance: 0,
+      otherAllowances: 0, perquisites: 0, netSalary: 0,
+    },
+    deductions: parsedList[parsedList.length - 1].deductions || {},
+    taxDetails: {
+      tdsPaid: 0,
+      assessmentYear: (parsedList[0].taxDetails || {}).assessmentYear || '2024-25',
+    },
+  };
+
+  for (const p of parsedList) {
+    const s = p.salaryDetails || {};
+    merged.salaryDetails.grossSalary += s.grossSalary || 0;
+    merged.salaryDetails.basicSalary += s.basicSalary || 0;
+    merged.salaryDetails.hra += s.hra || 0;
+    merged.salaryDetails.specialAllowance += s.specialAllowance || 0;
+    merged.salaryDetails.lta += s.lta || 0;
+    merged.salaryDetails.medicalAllowance += s.medicalAllowance || 0;
+    merged.salaryDetails.otherAllowances += s.otherAllowances || 0;
+    merged.salaryDetails.perquisites += s.perquisites || 0;
+    merged.salaryDetails.netSalary += s.netSalary || 0;
+    merged.taxDetails.tdsPaid += (p.taxDetails || {}).tdsPaid || 0;
+  }
+
+  return merged;
 };
 
 // ─── API functions ────────────────────────────────────────────────────────────
@@ -180,6 +327,27 @@ export const uploadForm16 = async (file, age) => {
   formData.append('form16', file);
   formData.append('age', age);
   const response = await api.post('/tax/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+};
+
+/**
+ * Upload multiple Form 16 PDFs (for users who changed jobs during the year).
+ * @param {File[]} files - Array of PDF File objects
+ * @param {number} age - Employee age
+ * @param {string[]} [passwords] - Optional array of PDF passwords (one per file, usually PAN number)
+ */
+export const uploadMultipleForm16 = async (files, age, passwords = []) => {
+  if (IS_GITHUB_PAGES) {
+    throw new Error('PDF upload requires the backend server. Please use Manual Entry instead.');
+  }
+  const formData = new FormData();
+  files.forEach(file => formData.append('form16s', file));
+  formData.append('age', age);
+  // Send passwords as an array field (one per file)
+  passwords.forEach(pw => formData.append('passwords', pw || ''));
+  const response = await api.post('/tax/upload-multiple', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return response.data;
@@ -217,6 +385,19 @@ export const getDeductionsInfo = async () => {
     return response.data;
   } catch {
     return { success: true, data: {} };
+  }
+};
+
+export const chatWithBot = async (question, taxData, comparisonResult) => {
+  if (IS_GITHUB_PAGES) {
+    return clientChatbot(question, taxData, comparisonResult);
+  }
+  try {
+    const response = await api.post('/tax/chat', { question, taxData, comparisonResult });
+    return response.data;
+  } catch (err) {
+    console.warn('Backend unreachable, using client-side chatbot:', err.message);
+    return clientChatbot(question, taxData, comparisonResult);
   }
 };
 

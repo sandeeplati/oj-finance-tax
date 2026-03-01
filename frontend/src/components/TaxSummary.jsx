@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingDown, TrendingUp, DollarSign, AlertTriangle, CheckCircle, Info } from 'lucide-react';
+import { TrendingDown, TrendingUp, DollarSign, AlertTriangle, CheckCircle, Info, Building2 } from 'lucide-react';
 import { formatCurrency, toIndianWords } from '../utils/formatters';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend
@@ -135,12 +135,62 @@ const TaxBreakdown = ({ regime, label }) => {
   );
 };
 
+// Multiple employers breakdown card
+const MultipleEmployersCard = ({ employers }) => (
+  <div className="bg-white rounded-xl p-6 shadow-sm border border-amber-200 bg-amber-50">
+    <div className="flex items-center space-x-2 mb-4">
+      <Building2 className="w-5 h-5 text-amber-600" />
+      <h3 className="text-lg font-semibold text-amber-800">
+        Combined Income from {employers.length} Employers
+      </h3>
+    </div>
+    <p className="text-xs text-amber-700 mb-4">
+      Salary income and TDS from all employers have been combined for accurate tax calculation.
+    </p>
+    <div className="space-y-3">
+      {employers.map((emp, i) => (
+        <div key={i} className="bg-white rounded-lg p-4 border border-amber-100">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center space-x-2">
+              <span className="w-6 h-6 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center text-xs font-bold">
+                {i + 1}
+              </span>
+              <span className="font-semibold text-gray-800 text-sm">
+                {emp.employerInfo?.name || `Employer ${i + 1}`}
+              </span>
+            </div>
+            {emp.employerInfo?.tan && (
+              <span className="text-xs text-gray-400">TAN: {emp.employerInfo.tan}</span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+            <div>
+              <span className="text-gray-400">Gross Salary: </span>
+              <span className="font-semibold">{formatCurrency(emp.salaryDetails?.grossSalary || 0)}</span>
+            </div>
+            <div>
+              <span className="text-gray-400">TDS Paid: </span>
+              <span className="font-semibold text-green-700">{formatCurrency(emp.taxDetails?.tdsPaid || 0)}</span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
 const TaxSummary = ({ data }) => {
-  const { taxData, comparisonResult, summary } = data;
+  const { taxData, comparisonResult, summary, multipleEmployers, employerCount } = data;
   const { oldRegime, newRegime, recommended, savings } = comparisonResult;
+  const employers = taxData.employers || [];
 
   return (
     <div className="space-y-6">
+      {/* Multiple Employers Banner */}
+      {multipleEmployers && employers.length > 1 && (
+        <MultipleEmployersCard employers={employers} />
+      )}
+
       {/* Alert Banner */}
       <div className={`flex items-start space-x-3 p-4 rounded-xl ${summary.refundDue > 0 ? 'bg-green-50 border border-green-200' : summary.taxDue > 0 ? 'bg-red-50 border border-red-200' : 'bg-blue-50 border border-blue-200'}`}>
         {summary.refundDue > 0 ? (
@@ -228,16 +278,23 @@ const TaxSummary = ({ data }) => {
                 <p className="font-semibold text-gray-800">{taxData.employeeInfo.pan}</p>
               </div>
             )}
-            {taxData.employerInfo?.name && (
+            {/* Show single employer info only when not multi-employer */}
+            {!multipleEmployers && taxData.employerInfo?.name && (
               <div>
                 <p className="text-xs text-gray-500">Employer</p>
                 <p className="font-semibold text-gray-800">{taxData.employerInfo.name}</p>
               </div>
             )}
-            {taxData.employerInfo?.tan && (
+            {!multipleEmployers && taxData.employerInfo?.tan && (
               <div>
                 <p className="text-xs text-gray-500">TAN</p>
                 <p className="font-semibold text-gray-800">{taxData.employerInfo.tan}</p>
+              </div>
+            )}
+            {multipleEmployers && (
+              <div>
+                <p className="text-xs text-gray-500">Employers</p>
+                <p className="font-semibold text-gray-800">{employerCount} employers (combined)</p>
               </div>
             )}
           </div>

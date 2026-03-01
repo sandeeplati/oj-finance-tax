@@ -1,15 +1,17 @@
 const express = require('express');
 const multer = require('multer');
 const router = express.Router();
-const { parseForm16 } = require('../utils/pdfParser');
+const { parseForm16, extractTaxData } = require('../utils/pdfParser');
+const pdfParse = require('pdf-parse');
 const { compareTaxRegimes } = require('../utils/taxCalculator');
-const { generateRecommendations, generateTaxSummary } = require('../utils/recommendationEngine');
+const { generateRecommendations, generateNextYearRecommendations, generateTaxSummary } = require('../utils/recommendationEngine');
+const { findAnswer, getSuggestedQuestions } = require('../utils/chatbot');
 
 // Configure multer for PDF uploads
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit per file
   fileFilter: (req, file, cb) => {
     if (file.mimetype === 'application/pdf') {
       cb(null, true);
@@ -19,7 +21,61 @@ const upload = multer({
   }
 });
 
-// POST /api/tax/upload - Upload and parse Form 16
+/**
+ * Merge multiple parsed Form 16 data objects into a single combined taxData.
+ * Salary components are summed across employers.
+ * Deductions are taken from the last/largest employer (they are personal, not per-employer).
+ * TDS paid is summed across all employers.
+ */
+function mergeMultipleForm16(parsedList) {
+  const merged = {
+    employeeInfo: parsedList[0].employeeInfo,
+    employers: parsedList.map((p, i) => ({
+      index: i + 1,
+      employerInfo: p.employerInfo,
+      salaryDetails: p.salaryDetails,
+      taxDetails: {
+        tdsPaid: p.taxDetails.tdsPaid || 0,
+        assessmentYear: p.taxDetails.assessmentYear,
+      },
+    })),
+    salaryDetails: {
+      grossSalary: 0,
+      basicSalary: 0,
+      hra: 0,
+      specialAllowance: 0,
+      lta: 0,
+      medicalAllowance: 0,
+      otherAllowances: 0,
+      perquisites: 0,
+      netSalary: 0,
+    },
+    deductions: parsedList[parsedList.length - 1].deductions, // personal deductions from last Form 16
+    taxDetails: {
+      tdsPaid: 0,
+      assessmentYear: parsedList[0].taxDetails.assessmentYear,
+    },
+  };
+
+  // Sum salary components and TDS across all employers
+  for (const parsed of parsedList) {
+    const s = parsed.salaryDetails;
+    merged.salaryDetails.grossSalary += s.grossSalary || 0;
+    merged.salaryDetails.basicSalary += s.basicSalary || 0;
+    merged.salaryDetails.hra += s.hra || 0;
+    merged.salaryDetails.specialAllowance += s.specialAllowance || 0;
+    merged.salaryDetails.lta += s.lta || 0;
+    merged.salaryDetails.medicalAllowance += s.medicalAllowance || 0;
+    merged.salaryDetails.otherAllowances += s.otherAllowances || 0;
+    merged.salaryDetails.perquisites += s.perquisites || 0;
+    merged.salaryDetails.netSalary += s.netSalary || 0;
+    merged.taxDetails.tdsPaid += parsed.taxDetails.tdsPaid || 0;
+  }
+
+  return merged;
+}
+
+// POST /api/tax/upload - Upload and parse single Form 16
 router.post('/upload', upload.single('form16'), async (req, res) => {
   try {
     if (!req.file) {
@@ -27,9 +83,11 @@ router.post('/upload', upload.single('form16'), async (req, res) => {
     }
 
     const age = parseInt(req.body.age) || 30;
-    const taxData = await parseForm16(req.file.buffer);
+    const password = req.body.password || '';   // optional PDF password
+    const taxData = await parseForm16(req.file.buffer, password || undefined);
     const comparisonResult = compareTaxRegimes(taxData, age);
     const recommendations = generateRecommendations(taxData, comparisonResult, age);
+    const nextYearRecommendations = generateNextYearRecommendations(taxData, comparisonResult, age);
     const summary = generateTaxSummary(taxData, comparisonResult);
 
     res.json({
@@ -38,11 +96,65 @@ router.post('/upload', upload.single('form16'), async (req, res) => {
         taxData,
         comparisonResult,
         recommendations,
+        nextYearRecommendations,
         summary
       }
     });
   } catch (error) {
     console.error('Error processing Form 16:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/tax/upload-multiple - Upload and parse multiple Form 16s (multiple employers)
+router.post('/upload-multiple', upload.array('form16s', 5), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, error: 'No PDF files uploaded' });
+    }
+
+    const age = parseInt(req.body.age) || 30;
+
+    // passwords[] array — one password per file (empty string = no password)
+    const rawPasswords = req.body.passwords;
+    const passwords = Array.isArray(rawPasswords)
+      ? rawPasswords
+      : rawPasswords
+        ? [rawPasswords]
+        : [];
+
+    // Parse all uploaded PDFs (with individual passwords)
+    const parsedList = await Promise.all(
+      req.files.map((file, i) => {
+        const pw = passwords[i] || '';
+        return parseForm16(file.buffer, pw || undefined);
+      })
+    );
+
+    // Merge into a single combined taxData
+    const taxData = parsedList.length === 1
+      ? parsedList[0]
+      : mergeMultipleForm16(parsedList);
+
+    const comparisonResult = compareTaxRegimes(taxData, age);
+    const recommendations = generateRecommendations(taxData, comparisonResult, age);
+    const nextYearRecommendations = generateNextYearRecommendations(taxData, comparisonResult, age);
+    const summary = generateTaxSummary(taxData, comparisonResult);
+
+    res.json({
+      success: true,
+      data: {
+        taxData,
+        comparisonResult,
+        recommendations,
+        nextYearRecommendations,
+        summary,
+        multipleEmployers: parsedList.length > 1,
+        employerCount: parsedList.length,
+      }
+    });
+  } catch (error) {
+    console.error('Error processing multiple Form 16s:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -57,11 +169,12 @@ router.post('/calculate', async (req, res) => {
 
     const comparisonResult = compareTaxRegimes(taxData, age);
     const recommendations = generateRecommendations(taxData, comparisonResult, age);
+    const nextYearRecommendations = generateNextYearRecommendations(taxData, comparisonResult, age);
     const summary = generateTaxSummary(taxData, comparisonResult);
 
     res.json({
       success: true,
-      data: { taxData, comparisonResult, recommendations, summary }
+      data: { taxData, comparisonResult, recommendations, nextYearRecommendations, summary }
     });
   } catch (error) {
     console.error('Error calculating tax:', error);
@@ -119,6 +232,74 @@ router.get('/deductions', (req, res) => {
       { section: 'Standard Deduction', limit: 50000, description: '₹50,000 (Old) / ₹75,000 (New) flat deduction', regime: 'both' }
     ]
   });
+});
+
+// POST /api/tax/chat - Tax chatbot
+router.post('/chat', (req, res) => {
+  try {
+    const { question, taxData, comparisonResult } = req.body;
+    if (!question || !question.trim()) {
+      return res.status(400).json({ success: false, error: 'Question is required' });
+    }
+    const result = findAnswer(question.trim(), taxData, comparisonResult);
+    const hasForm16 = !!(taxData && comparisonResult);
+    const suggestions = getSuggestedQuestions(hasForm16);
+    res.json({
+      success: true,
+      data: {
+        answer: result.answer,
+        source: result.source,
+        suggestions,
+      },
+    });
+  } catch (error) {
+    console.error('Chatbot error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/tax/chat/suggestions - Get suggested questions
+router.get('/chat/suggestions', (req, res) => {
+  const hasForm16 = req.query.hasForm16 === 'true';
+  res.json({ success: true, data: getSuggestedQuestions(hasForm16) });
+});
+
+// POST /api/tax/debug-parse - Debug endpoint: returns raw text + extracted fields
+// Useful for diagnosing Form 16 parsing issues
+router.post('/debug-parse', upload.single('form16'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No PDF file uploaded' });
+    }
+    const password = req.body.password || '';
+    const input = password
+      ? { data: new Uint8Array(req.file.buffer), password }
+      : req.file.buffer;
+
+    const pdfData = await pdfParse(input);
+    const rawText = pdfData.text;
+    const extracted = extractTaxData(rawText);
+
+    // Return full raw text + all extracted fields for debugging
+    res.json({
+      success: true,
+      debug: {
+        rawTextPreview: rawText, // full text
+        rawTextLength: rawText.length,
+        linesWithNumbers: rawText.split('\n')
+          .filter(l => /\d{4,}/.test(l)),
+        extracted: {
+          employeeInfo: extracted.employeeInfo,
+          employerInfo: extracted.employerInfo,
+          salaryDetails: extracted.salaryDetails,
+          deductions: extracted.deductions,
+          taxDetails: extracted.taxDetails,
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 module.exports = router;
