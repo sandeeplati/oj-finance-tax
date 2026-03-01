@@ -273,6 +273,234 @@ function generateRecommendations(taxData, comparisonResult, age = 30) {
   return recommendations;
 }
 
+/**
+ * Generate forward-looking recommendations for the NEXT financial year (FY 2025-26)
+ * based on patterns observed in the current Form 16.
+ */
+function generateNextYearRecommendations(taxData, comparisonResult, age = 30) {
+  const nextYear = [];
+  const { oldRegime, newRegime, recommended, savings } = comparisonResult;
+  const { salaryDetails, deductions } = taxData;
+  const grossSalary = salaryDetails?.grossSalary || 0;
+  const taxableIncome = recommended === 'old' ? oldRegime.taxableIncome : newRegime.taxableIncome;
+
+  // ── 1. Regime Planning ──────────────────────────────────────────────────────
+  const oldTax = oldRegime.totalTax;
+  const newTax = newRegime.totalTax;
+  const regimeDiff = Math.abs(oldTax - newTax);
+
+  nextYear.push({
+    category: 'Regime Strategy',
+    icon: '🏛️',
+    priority: 'HIGH',
+    title: `Plan for ${recommended === 'old' ? 'Old' : 'New'} Regime in FY 2025-26`,
+    description: recommended === 'old'
+      ? `Old regime saved you ₹${formatCurrency(savings)} this year. For FY 2025-26, maintain your deduction investments early in the year to keep this advantage.`
+      : `New regime saved you ₹${formatCurrency(savings)} this year. FY 2025-26 new regime slabs remain the same — continue with simplified filing.`,
+    impact: savings,
+    timeline: 'April 2025 onwards',
+    actionItems: recommended === 'old'
+      ? [
+          'Declare investment intent to employer in April 2025 to reduce monthly TDS',
+          'Start SIP in ELSS from April to spread ₹1.5L 80C investment across 12 months',
+          'Renew health insurance before April to claim 80D from day one',
+          'Submit HRA rent receipts quarterly to employer',
+          'Invest in NPS 80CCD(1B) ₹50,000 early in the year'
+        ]
+      : [
+          'Opt for New Regime with employer at the start of FY 2025-26',
+          'No need to submit investment proofs — simpler payroll',
+          'Focus on wealth creation (ELSS, mutual funds) without tax lock-in',
+          'Employer NPS contribution (80CCD(2)) still available in new regime'
+        ]
+  });
+
+  // ── 2. 80C Gap Analysis ─────────────────────────────────────────────────────
+  const current80C = deductions.section80C || 0;
+  const gap80C = Math.max(0, MAX_80C - current80C);
+  if (gap80C > 0 && recommended === 'old') {
+    const monthlySIP = Math.ceil(gap80C / 12);
+    nextYear.push({
+      category: 'Section 80C Planning',
+      icon: '📈',
+      priority: gap80C > 75000 ? 'HIGH' : 'MEDIUM',
+      title: `Start Monthly SIP to Fill ₹${formatCurrency(gap80C)} 80C Gap`,
+      description: `This year you utilized ₹${formatCurrency(current80C)} of ₹1,50,000 80C limit. Next year, start a monthly SIP of ₹${formatCurrency(monthlySIP)} from April to fully utilize the limit without year-end rush.`,
+      impact: calculateTaxSaving(gap80C, taxableIncome),
+      timeline: 'Start April 2025',
+      actionItems: [
+        `Start ELSS SIP of ₹${formatCurrency(monthlySIP)}/month from April 2025`,
+        'Set up auto-debit to avoid missing months',
+        'ELSS has 3-year lock-in but best returns among 80C options',
+        'Alternatively: increase VPF contribution for guaranteed returns',
+        'PPF: deposit before April 5 each year for maximum interest'
+      ]
+    });
+  }
+
+  // ── 3. Health Insurance ─────────────────────────────────────────────────────
+  const current80D = deductions.section80D || 0;
+  const max80D = age >= 60 ? 100000 : 50000;
+  const gap80D = Math.max(0, max80D - current80D);
+  if (gap80D > 0 && recommended === 'old') {
+    nextYear.push({
+      category: 'Health Insurance',
+      icon: '🏥',
+      priority: 'HIGH',
+      title: 'Upgrade Health Insurance Coverage for FY 2025-26',
+      description: `You claimed ₹${formatCurrency(current80D)} under 80D this year. You can claim up to ₹${formatCurrency(max80D)} (self + parents). Upgrading coverage saves tax AND provides better protection.`,
+      impact: calculateTaxSaving(gap80D, taxableIncome),
+      timeline: 'Before April 2025',
+      actionItems: [
+        'Renew/upgrade family floater plan before April 2025',
+        'Add parents to policy for additional ₹25,000–₹50,000 deduction',
+        'Consider top-up plan for higher coverage at lower premium',
+        'Preventive health check-up: ₹5,000 within 80D limit',
+        'Keep premium receipts for ITR filing'
+      ]
+    });
+  }
+
+  // ── 4. NPS Planning ─────────────────────────────────────────────────────────
+  const currentNPS = deductions.nps || 0;
+  if (currentNPS < MAX_NPS_80CCD1B && recommended === 'old') {
+    const npsGap = MAX_NPS_80CCD1B - currentNPS;
+    const monthlyNPS = Math.ceil(npsGap / 12);
+    nextYear.push({
+      category: 'NPS Investment',
+      icon: '🏦',
+      priority: 'MEDIUM',
+      title: 'Maximize NPS 80CCD(1B) — Extra ₹50,000 Deduction',
+      description: `NPS gives ₹50,000 deduction OVER AND ABOVE 80C. You used ₹${formatCurrency(currentNPS)} this year. Invest ₹${formatCurrency(monthlyNPS)}/month next year to maximize this benefit.`,
+      impact: calculateTaxSaving(npsGap, taxableIncome),
+      timeline: 'April 2025 onwards',
+      actionItems: [
+        `Set up monthly NPS contribution of ₹${formatCurrency(monthlyNPS)} via employer or bank`,
+        'Ask employer to deduct NPS from salary (80CCD(2) — no limit in new regime too)',
+        'Choose Tier I account for tax benefits',
+        'Equity allocation (up to 75%) recommended for long-term growth',
+        'NPS returns are market-linked; historically 10-12% p.a.'
+      ]
+    });
+  }
+
+  // ── 5. Salary Structure Optimization ───────────────────────────────────────
+  const hra = salaryDetails.hra || 0;
+  const lta = salaryDetails.lta || 0;
+  const specialAllowance = salaryDetails.specialAllowance || 0;
+
+  if (specialAllowance > 0 && (hra === 0 || lta === 0) && recommended === 'old') {
+    nextYear.push({
+      category: 'Salary Restructuring',
+      icon: '💼',
+      priority: 'MEDIUM',
+      title: 'Restructure Salary to Reduce Taxable Income',
+      description: `Your salary has ₹${formatCurrency(specialAllowance)} as special allowance (fully taxable). Request HR to restructure into tax-exempt components for FY 2025-26.`,
+      impact: calculateTaxSaving(Math.min(specialAllowance * 0.3, 50000), taxableIncome),
+      timeline: 'April 2025 (start of new FY)',
+      actionItems: [
+        'Request HRA component if you pay rent (50% of basic in metro, 40% non-metro)',
+        'Add LTA component — 2 tax-free journeys per 4-year block',
+        'Food coupons/meal allowance: ₹50/meal × 2 meals × 22 days = ₹26,400/year tax-free',
+        'Phone/internet reimbursement: actual bills tax-free',
+        'Uniform/dress allowance if applicable',
+        'Discuss with HR at the start of FY 2025-26'
+      ]
+    });
+  }
+
+  // ── 6. Home Loan Planning ───────────────────────────────────────────────────
+  if (grossSalary > 800000 && !deductions.homeLoanInterest) {
+    nextYear.push({
+      category: 'Home Loan',
+      icon: '🏡',
+      priority: 'LOW',
+      title: 'Consider Home Loan for Dual Tax Benefits in FY 2025-26',
+      description: `With your income of ₹${formatCurrency(grossSalary)}, a home loan gives dual benefits: Principal under 80C (₹1.5L) + Interest under 24(b) (₹2L). Total potential saving: ₹${formatCurrency(calculateTaxSaving(350000, taxableIncome))}/year.`,
+      impact: calculateTaxSaving(350000, taxableIncome),
+      timeline: 'Plan before FY 2025-26',
+      actionItems: [
+        'Section 24(b): Deduct up to ₹2,00,000 on home loan interest',
+        'Section 80C: Principal repayment within ₹1.5L limit',
+        'First-time buyers: Additional ₹50,000 under Section 80EE',
+        'Affordable housing (< ₹45L): Additional ₹1.5L under Section 80EEA',
+        'Joint home loan: Both co-borrowers can claim separately'
+      ]
+    });
+  }
+
+  // ── 7. Advance Tax Planning ─────────────────────────────────────────────────
+  const tdsPaid = taxData.taxDetails?.tdsPaid || 0;
+  const totalTax = recommended === 'old' ? oldRegime.totalTax : newRegime.totalTax;
+  const taxDue = Math.max(0, totalTax - tdsPaid);
+
+  if (taxDue > 10000) {
+    nextYear.push({
+      category: 'Advance Tax',
+      icon: '📅',
+      priority: 'HIGH',
+      title: 'Plan Advance Tax Payments for FY 2025-26',
+      description: `You had ₹${formatCurrency(taxDue)} tax due this year. For FY 2025-26, pay advance tax in installments to avoid interest under Section 234B/234C.`,
+      impact: Math.round(taxDue * 0.01 * 3), // ~3 months interest saved
+      timeline: 'June 15, Sep 15, Dec 15, Mar 15',
+      actionItems: [
+        '15 June 2025: Pay 15% of estimated annual tax',
+        '15 September 2025: Pay 45% of estimated annual tax',
+        '15 December 2025: Pay 75% of estimated annual tax',
+        '15 March 2026: Pay 100% of estimated annual tax',
+        'Pay via incometax.gov.in → e-Pay Tax → Advance Tax (Code 100)',
+        'Interest @ 1%/month for shortfall under Section 234B/234C'
+      ]
+    });
+  }
+
+  // ── 8. Investment Diversification ──────────────────────────────────────────
+  if (grossSalary > 600000) {
+    nextYear.push({
+      category: 'Wealth Building',
+      icon: '💹',
+      priority: 'LOW',
+      title: 'Build Tax-Efficient Investment Portfolio for FY 2025-26',
+      description: 'Beyond tax saving, build a diversified portfolio. Long-term capital gains up to ₹1.25L are tax-free; ELSS and equity funds are most tax-efficient.',
+      impact: 0,
+      timeline: 'FY 2025-26',
+      actionItems: [
+        'ELSS: Tax saving + wealth creation (LTCG ₹1.25L tax-free)',
+        'PPF: Risk-free, tax-free returns at 7.1% p.a.',
+        'Index Funds: Low cost, market returns, LTCG tax-efficient',
+        'Sovereign Gold Bonds: 2.5% interest + gold appreciation, tax-free on maturity',
+        'Avoid FDs for high earners — interest fully taxable at slab rate',
+        'Consider Debt Mutual Funds for better post-tax returns vs FD'
+      ]
+    });
+  }
+
+  // ── 9. ITR Filing Strategy ──────────────────────────────────────────────────
+  nextYear.push({
+    category: 'ITR Strategy',
+    icon: '📋',
+    priority: 'MEDIUM',
+    title: 'File ITR Early for FY 2025-26 (AY 2026-27)',
+    description: 'Filing ITR early (April–June) speeds up refunds, avoids last-minute errors, and allows time to respond to any notices.',
+    impact: 0,
+    timeline: 'April–July 2026',
+    actionItems: [
+      'Collect Form 16 from employer by June 15, 2026',
+      'Download Form 26AS and AIS from income tax portal',
+      'Cross-check TDS in Form 26AS with Form 16',
+      'File ITR-1 (salaried, income ≤ ₹50L) or ITR-2 (capital gains)',
+      'e-Verify within 30 days using Aadhaar OTP',
+      'Deadline: July 31, 2026 (without penalty)'
+    ]
+  });
+
+  // Sort by priority
+  const priorityOrder = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+  nextYear.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+
+  return nextYear;
+}
+
 function generateTaxSummary(taxData, comparisonResult) {
   const { oldRegime, newRegime, recommended, savings } = comparisonResult;
   const tdsPaid = taxData.taxDetails?.tdsPaid || 0;
@@ -294,6 +522,6 @@ function generateTaxSummary(taxData, comparisonResult) {
   };
 }
 
-module.exports = { generateRecommendations, generateTaxSummary, formatCurrency };
+module.exports = { generateRecommendations, generateNextYearRecommendations, generateTaxSummary, formatCurrency };
 
 // Made with Bob

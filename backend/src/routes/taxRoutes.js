@@ -3,7 +3,7 @@ const multer = require('multer');
 const router = express.Router();
 const { parseForm16 } = require('../utils/pdfParser');
 const { compareTaxRegimes } = require('../utils/taxCalculator');
-const { generateRecommendations, generateTaxSummary } = require('../utils/recommendationEngine');
+const { generateRecommendations, generateNextYearRecommendations, generateTaxSummary } = require('../utils/recommendationEngine');
 const { findAnswer, getSuggestedQuestions } = require('../utils/chatbot');
 
 // Configure multer for PDF uploads
@@ -86,6 +86,7 @@ router.post('/upload', upload.single('form16'), async (req, res) => {
     const taxData = await parseForm16(req.file.buffer, password || undefined);
     const comparisonResult = compareTaxRegimes(taxData, age);
     const recommendations = generateRecommendations(taxData, comparisonResult, age);
+    const nextYearRecommendations = generateNextYearRecommendations(taxData, comparisonResult, age);
     const summary = generateTaxSummary(taxData, comparisonResult);
 
     res.json({
@@ -94,6 +95,7 @@ router.post('/upload', upload.single('form16'), async (req, res) => {
         taxData,
         comparisonResult,
         recommendations,
+        nextYearRecommendations,
         summary
       }
     });
@@ -135,6 +137,7 @@ router.post('/upload-multiple', upload.array('form16s', 5), async (req, res) => 
 
     const comparisonResult = compareTaxRegimes(taxData, age);
     const recommendations = generateRecommendations(taxData, comparisonResult, age);
+    const nextYearRecommendations = generateNextYearRecommendations(taxData, comparisonResult, age);
     const summary = generateTaxSummary(taxData, comparisonResult);
 
     res.json({
@@ -143,6 +146,7 @@ router.post('/upload-multiple', upload.array('form16s', 5), async (req, res) => 
         taxData,
         comparisonResult,
         recommendations,
+        nextYearRecommendations,
         summary,
         multipleEmployers: parsedList.length > 1,
         employerCount: parsedList.length,
@@ -164,11 +168,12 @@ router.post('/calculate', async (req, res) => {
 
     const comparisonResult = compareTaxRegimes(taxData, age);
     const recommendations = generateRecommendations(taxData, comparisonResult, age);
+    const nextYearRecommendations = generateNextYearRecommendations(taxData, comparisonResult, age);
     const summary = generateTaxSummary(taxData, comparisonResult);
 
     res.json({
       success: true,
-      data: { taxData, comparisonResult, recommendations, summary }
+      data: { taxData, comparisonResult, recommendations, nextYearRecommendations, summary }
     });
   } catch (error) {
     console.error('Error calculating tax:', error);

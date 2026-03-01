@@ -177,7 +177,10 @@ function App() {
 
         {/* Recommendations */}
         {activeTab === 'recommendations' && taxResult && (
-          <Recommendations recommendations={taxResult.recommendations} />
+          <Recommendations
+            recommendations={taxResult.recommendations}
+            nextYearRecommendations={taxResult.nextYearRecommendations}
+          />
         )}
 
         {/* Deductions */}
