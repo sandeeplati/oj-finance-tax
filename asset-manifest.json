@@ -1,13 +1,13 @@
 {
   "files": {
-    "main.css": "/oj-finance-tax/static/css/main.d34f2ffa.css",
-    "main.js": "/oj-finance-tax/static/js/main.a4ecb793.js",
+    "main.css": "/oj-finance-tax/static/css/main.417af393.css",
+    "main.js": "/oj-finance-tax/static/js/main.f657d0db.js",
     "index.html": "/oj-finance-tax/index.html",
-    "main.d34f2ffa.css.map": "/oj-finance-tax/static/css/main.d34f2ffa.css.map",
-    "main.a4ecb793.js.map": "/oj-finance-tax/static/js/main.a4ecb793.js.map"
+    "main.417af393.css.map": "/oj-finance-tax/static/css/main.417af393.css.map",
+    "main.f657d0db.js.map": "/oj-finance-tax/static/js/main.f657d0db.js.map"
   },
   "entrypoints": [
-    "static/css/main.d34f2ffa.css",
-    "static/js/main.a4ecb793.js"
+    "static/css/main.417af393.css",
+    "static/js/main.f657d0db.js"
   ]
 }
