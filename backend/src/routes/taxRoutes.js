@@ -1,7 +1,8 @@
 const express = require('express');
 const multer = require('multer');
 const router = express.Router();
-const { parseForm16 } = require('../utils/pdfParser');
+const { parseForm16, extractTaxData } = require('../utils/pdfParser');
+const pdfParse = require('pdf-parse');
 const { compareTaxRegimes } = require('../utils/taxCalculator');
 const { generateRecommendations, generateNextYearRecommendations, generateTaxSummary } = require('../utils/recommendationEngine');
 const { findAnswer, getSuggestedQuestions } = require('../utils/chatbot');
@@ -261,6 +262,44 @@ router.post('/chat', (req, res) => {
 router.get('/chat/suggestions', (req, res) => {
   const hasForm16 = req.query.hasForm16 === 'true';
   res.json({ success: true, data: getSuggestedQuestions(hasForm16) });
+});
+
+// POST /api/tax/debug-parse - Debug endpoint: returns raw text + extracted fields
+// Useful for diagnosing Form 16 parsing issues
+router.post('/debug-parse', upload.single('form16'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No PDF file uploaded' });
+    }
+    const password = req.body.password || '';
+    const input = password
+      ? { data: new Uint8Array(req.file.buffer), password }
+      : req.file.buffer;
+
+    const pdfData = await pdfParse(input);
+    const rawText = pdfData.text;
+    const extracted = extractTaxData(rawText);
+
+    // Return full raw text + all extracted fields for debugging
+    res.json({
+      success: true,
+      debug: {
+        rawTextPreview: rawText, // full text
+        rawTextLength: rawText.length,
+        linesWithNumbers: rawText.split('\n')
+          .filter(l => /\d{4,}/.test(l)),
+        extracted: {
+          employeeInfo: extracted.employeeInfo,
+          employerInfo: extracted.employerInfo,
+          salaryDetails: extracted.salaryDetails,
+          deductions: extracted.deductions,
+          taxDetails: extracted.taxDetails,
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 module.exports = router;
