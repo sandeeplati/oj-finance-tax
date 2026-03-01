@@ -4,6 +4,7 @@ const router = express.Router();
 const { parseForm16 } = require('../utils/pdfParser');
 const { compareTaxRegimes } = require('../utils/taxCalculator');
 const { generateRecommendations, generateTaxSummary } = require('../utils/recommendationEngine');
+const { findAnswer, getSuggestedQuestions } = require('../utils/chatbot');
 
 // Configure multer for PDF uploads
 const storage = multer.memoryStorage();
@@ -225,6 +226,36 @@ router.get('/deductions', (req, res) => {
       { section: 'Standard Deduction', limit: 50000, description: '₹50,000 (Old) / ₹75,000 (New) flat deduction', regime: 'both' }
     ]
   });
+});
+
+// POST /api/tax/chat - Tax chatbot
+router.post('/chat', (req, res) => {
+  try {
+    const { question, taxData, comparisonResult } = req.body;
+    if (!question || !question.trim()) {
+      return res.status(400).json({ success: false, error: 'Question is required' });
+    }
+    const result = findAnswer(question.trim(), taxData, comparisonResult);
+    const hasForm16 = !!(taxData && comparisonResult);
+    const suggestions = getSuggestedQuestions(hasForm16);
+    res.json({
+      success: true,
+      data: {
+        answer: result.answer,
+        source: result.source,
+        suggestions,
+      },
+    });
+  } catch (error) {
+    console.error('Chatbot error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/tax/chat/suggestions - Get suggested questions
+router.get('/chat/suggestions', (req, res) => {
+  const hasForm16 = req.query.hasForm16 === 'true';
+  res.json({ success: true, data: getSuggestedQuestions(hasForm16) });
 });
 
 module.exports = router;

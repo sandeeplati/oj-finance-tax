@@ -7,6 +7,7 @@ import Recommendations from './components/Recommendations';
 import DeductionsAnalyzer from './components/DeductionsAnalyzer';
 import TaxSlabs from './components/TaxSlabs';
 import ManualEntry from './components/ManualEntry';
+import ChatBot from './components/ChatBot';
 import { uploadMultipleForm16 } from './services/taxApi';
 
 const NAV_TABS = [
@@ -214,6 +215,8 @@ function App() {
           </div>
         </div>
       </footer>
+      {/* Floating Tax Chatbot */}
+      <ChatBot taxResult={taxResult} />
     </div>
   );
 }

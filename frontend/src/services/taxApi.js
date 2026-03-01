@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { clientChatbot } from './clientChatbot';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
@@ -285,6 +286,19 @@ export const getDeductionsInfo = async () => {
     return response.data;
   } catch {
     return { success: true, data: {} };
+  }
+};
+
+export const chatWithBot = async (question, taxData, comparisonResult) => {
+  if (IS_GITHUB_PAGES) {
+    return clientChatbot(question, taxData, comparisonResult);
+  }
+  try {
+    const response = await api.post('/tax/chat', { question, taxData, comparisonResult });
+    return response.data;
+  } catch (err) {
+    console.warn('Backend unreachable, using client-side chatbot:', err.message);
+    return clientChatbot(question, taxData, comparisonResult);
   }
 };
 
